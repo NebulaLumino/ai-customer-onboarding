@@ -1,65 +1,78 @@
-import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
+import { NextRequest, NextResponse } from "next/server";
 
 const client = new OpenAI({
-  apiKey: process.env.DEEPSEEK_API_KEY,
-  baseURL: process.env.DEEPSEEK_BASE_URL,
+  baseURL: "https://api.deepseek.com/v1",
+  apiKey: process.env.DEEPSEEK_API_KEY || "",
 });
 
 export async function POST(req: NextRequest) {
   try {
-    const { productName, productType, keyFeatures, customerGoals, tone } = await req.json();
-
-    if (!productName) {
-      return NextResponse.json({ error: "Product name is required" }, { status: 400 });
+    const { productType, keyFeatures, customerGoals, deliveryDays } = await req.json();
+    if (!productType?.trim()) {
+      return NextResponse.json({ error: "Product type is required." }, { status: 400 });
     }
-
-    const prompt = `You are an expert email copywriter specializing in SaaS onboarding sequences. Generate a 7-email onboarding sequence for ${productName}.
-
-Product Name: ${productName}
-Product Type: ${productType || "SaaS Product"}
-Key Features: ${keyFeatures || "Core features of the product"}
-Customer Goals: ${customerGoals || "What customers want to achieve"}
-Tone: ${tone || "Friendly, professional, encouraging"}
-
-Generate exactly 7 emails in this JSON format (no markdown):
-{
-  "emails": [
-    {
-      "day": 1,
-      "subject": "Email subject line",
-      "preview": "Email preview text (50 chars max)",
-      "body": "Full email body copy. Use clear paragraphs. Include CTA buttons indicated as [CTA: button text]. Warm, helpful tone.",
-      "goal": "What this email is trying to achieve",
-      "trigger": "When to send this email (e.g. immediately after signup, 3 days after login, etc.)"
-    }
-  ]
-}
-
-Email sequence logic:
-- Email 1 (Day 0): Welcome + instant value / quick start guide
-- Email 2 (Day 1): Feature deep-dive #1 — most important feature
-- Email 3 (Day 3): Social proof / case study
-- Email 4 (Day 5): Feature deep-dive #2 — second most important feature  
-- Email 5 (Day 7): Success milestone / "you've accomplished X" celebration
-- Email 6 (Day 10): Engagement prompt — get them to do the key action
-- Email 7 (Day 14): Soft upgrade CTA + support offer
-
-Make each email 120-180 words. Conversational, not corporate. Focus on customer success, not selling.`;
 
     const completion = await client.chat.completions.create({
       model: "deepseek-chat",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.85,
+      messages: [
+        {
+          role: "system",
+          content: `You are an expert email marketer and customer success specialist. Generate comprehensive 5-7 email onboarding sequences that educate, engage, and activate new customers. Emails should flow naturally from welcome to value to upgrade.`,
+        },
+        {
+          role: "user",
+          content: `Generate a professional email onboarding sequence for new customers.
+
+**Product Type:** ${productType}
+**Key Features:** ${keyFeatures || "Core features of the product"}
+**Customer Goals:** ${customerGoals || "Get started and see value quickly"}
+**Delivery Timing:** ${deliveryDays || "Space emails 2-3 days apart"}
+
+Create a 5-7 email sequence with this structure:
+
+---
+
+## Day 1 — Welcome Email
+[Email 1: Warm welcome, what to expect, getting started link]
+
+## Day 3 — Quick Win
+[Email 2: Help them achieve their first specific result with the product]
+
+## Day 5 — Feature Deep-Dive
+[Email 3: Highlight a key feature with a practical use case]
+
+## Day 7 — Social Proof & Community
+[Email 4: Show how other customers succeeded, invite to community]
+
+## Day 10 — Advanced Tips
+[Email 5: Share pro tips, hidden features, or integration ideas]
+
+## Day 14 — Check-In
+[Email 6: Ask how it's going, offer help, foreshadow upgrade]
+
+## Day 21 — Upgrade/Next Step Prompt
+[Email 7: Gently introduce higher tier or add-on that matches their usage]
+
+---
+
+For EACH email provide:
+- Subject line (and 2-3 alternatives)
+- Preview text (1 sentence)
+- Full email body (100-180 words each)
+- Call-to-action button copy
+
+Make each email feel personal. Reference the product type specifically. Vary the tone — some educational, some exciting, some warm and personal.`,
+        },
+      ],
+      max_tokens: 2000,
+      temperature: 0.65,
     });
 
-    const raw = completion.choices[0]?.message?.content || "";
-    const cleaned = raw.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    const data = JSON.parse(cleaned);
-
-    return NextResponse.json(data);
-  } catch (err: unknown) {
+    const result = completion.choices[0]?.message?.content || "";
+    return NextResponse.json({ result });
+  } catch (err) {
     console.error(err);
-    return NextResponse.json({ error: "Generation failed" }, { status: 500 });
+    return NextResponse.json({ error: "Generation failed." }, { status: 500 });
   }
 }

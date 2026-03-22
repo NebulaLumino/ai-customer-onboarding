@@ -1,168 +1,96 @@
 "use client";
-
 import { useState } from "react";
 
-const PRODUCT_TYPES = ["SaaS / Cloud Product", "Mobile App", "Marketplace", "Community Platform", "Course / Learning Platform", "Agency / Service"];
-const TONES = ["Friendly & Conversational", "Professional & Formal", "Playful & Casual", "Empathetic & Supportive"];
-
-export default function OnboardingEmailPage() {
-  const [form, setForm] = useState({
-    productName: "", productType: "SaaS / Cloud Product",
-    keyFeatures: "", customerGoals: "", tone: "Friendly & Conversational",
+function renderMarkdown(text: string) {
+  return text.split("\n").map((line, i) => {
+    const trimmed = line.trim();
+    if (trimmed.startsWith("## ")) return <h2 key={i} className="text-xl font-bold text-gray-900 mt-7 mb-3">{trimmed.replace("## ","")}</h2>;
+    if (trimmed.startsWith("### ")) return <h3 key={i} className="text-base font-bold text-teal-700 mt-4 mb-2">{trimmed.replace("### ","")}</h3>;
+    if (trimmed.startsWith("- ")) return <li key={i} className="text-gray-700 text-sm ml-4 mb-1 list-disc">{trimmed.replace("- ","")}</li>;
+    if (trimmed.startsWith("> ")) return <blockquote key={i} className="border-l-4 border-teal-400 pl-4 italic text-gray-600 text-sm my-3">{trimmed.replace("> ","")}</blockquote>;
+    if (trimmed.startsWith("**") && trimmed.includes(":**")) return <p key={i} className="text-teal-800 font-bold text-sm mt-3 mb-1">{trimmed.replace(/\*\*/g,"")}</p>;
+    if (trimmed === "") return <div key={i} className="h-2" />;
+    return <p key={i} className="text-gray-700 text-sm leading-relaxed mb-1">{trimmed}</p>;
   });
-  const [emails, setEmails] = useState<any[]>([]);
+}
+
+export default function Home() {
+  const [productType, setProductType] = useState("");
+  const [keyFeatures, setKeyFeatures] = useState("");
+  const [customerGoals, setCustomerGoals] = useState("");
+  const [deliveryDays, setDeliveryDays] = useState("");
+  const [result, setResult] = useState("");
   const [loading, setLoading] = useState(false);
-  const [activeEmail, setActiveEmail] = useState(0);
-  const [copied, setCopied] = useState(false);
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
 
-  function update(k: string, v: string) { setForm((f) => ({ ...f, [k]: v })); }
-
-  async function generate() {
-    if (!form.productName.trim()) return;
-    setLoading(true);
-    setEmails([]);
-    setActiveEmail(0);
+  const generate = async () => {
+    if (!productType.trim()) { setError("Please enter the product type."); return; }
+    setLoading(true); setError(""); setResult(""); setDone(false);
     try {
       const res = await fetch("/api/generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ productType, keyFeatures, customerGoals, deliveryDays }),
       });
       const data = await res.json();
-      if (data.emails) setEmails(data.emails);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  function copyAll() {
-    const text = emails.map((e) =>
-      `--- EMAIL ${e.day}: ${e.subject} ---\nTrigger: ${e.trigger}\nGoal: ${e.goal}\nSubject: ${e.subject}\nPreview: ${e.preview}\n\n${e.body}`
-    ).join("\n\n");
-    navigator.clipboard.writeText(text);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
-  }
-
-  const triggerColors: Record<string, string> = {
-    "immediately": "bg-green-100 text-green-700",
-    "day 1": "bg-blue-100 text-blue-700",
-    "day 3": "bg-indigo-100 text-indigo-700",
-    "day 5": "bg-purple-100 text-purple-700",
-    "day 7": "bg-amber-100 text-amber-700",
-    "day 10": "bg-orange-100 text-orange-700",
-    "day 14": "bg-red-100 text-red-700",
+      if (!res.ok) { setError(data.error || "Generation failed."); return; }
+      setResult(data.result); setDone(true);
+    } catch { setError("Failed to connect."); }
+    finally { setLoading(false); }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-sky-50 to-cyan-50">
-      <div className="max-w-5xl mx-auto px-4 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-teal-50 to-white px-4 py-12">
+      <div className="max-w-3xl mx-auto">
         <div className="text-center mb-10">
-          <div className="inline-flex items-center gap-2 bg-sky-100 text-sky-700 px-4 py-1.5 rounded-full text-sm font-medium mb-4">
-            <span className="w-2 h-2 bg-sky-500 rounded-full animate-pulse" />
-            SaaS Customer Success Tool
-          </div>
-          <h1 className="text-4xl font-bold text-slate-900 mb-3">AI Onboarding Email Sequence</h1>
-          <p className="text-slate-500 text-lg max-w-xl mx-auto">
-            Generate a 7-email onboarding sequence optimized for activation, education, and retention.
-          </p>
+          <h1 className="text-4xl font-bold text-gray-900 mb-2">📧 AI Onboarding Email Sequence</h1>
+          <p className="text-gray-600">Generate a 5-7 email sequence that activates and delights new customers</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-lg border border-slate-200 p-8 mb-8">
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="col-span-2">
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Product Name *</label>
-              <input value={form.productName} onChange={(e) => update("productName", e.target.value)}
-                placeholder="Acme Pro"
-                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+        <div className="bg-white rounded-2xl shadow-lg p-8 space-y-5">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Product Type *</label>
+            <input value={productType} onChange={e => setProductType(e.target.value)} placeholder="e.g. SaaS project management tool, online course, e-commerce platform"
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none" />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Key Features</label>
+            <textarea value={keyFeatures} onChange={e => setKeyFeatures(e.target.value)} rows={3}
+              placeholder="List the top 3-5 features customers care about most..."
+              className="w-full border border-gray-300 rounded-lg px-4 py-3 focus:ring-2 focus:ring-teal-500 outline-none resize-none text-sm" />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Customer Goals</label>
+              <input value={customerGoals} onChange={e => setCustomerGoals(e.target.value)} placeholder="e.g. Save time, close deals faster"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none text-sm" />
             </div>
             <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Product Type</label>
-              <select value={form.productType} onChange={(e) => update("productType", e.target.value)}
-                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
-                {PRODUCT_TYPES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Tone</label>
-              <select value={form.tone} onChange={(e) => update("tone", e.target.value)}
-                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500 bg-white">
-                {TONES.map((t) => <option key={t}>{t}</option>)}
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Key Features</label>
-              <input value={form.keyFeatures} onChange={(e) => update("keyFeatures", e.target.value)}
-                placeholder="e.g. Project management, team collaboration, analytics dashboards"
-                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-sm font-semibold text-slate-700 mb-1.5">Customer Goals</label>
-              <input value={form.customerGoals} onChange={(e) => update("customerGoals", e.target.value)}
-                placeholder="e.g. Ship projects faster, reduce team friction, track KPIs"
-                className="w-full border border-slate-300 rounded-xl px-4 py-3 text-slate-800 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500" />
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email Spacing</label>
+              <input value={deliveryDays} onChange={e => setDeliveryDays(e.target.value)} placeholder="e.g. Every 2-3 days"
+                className="w-full border border-gray-300 rounded-lg px-3 py-2 outline-none text-sm" />
             </div>
           </div>
-
-          <button onClick={generate} disabled={loading || !form.productName.trim()}
-            className="w-full mt-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-300 text-white font-semibold py-4 rounded-xl transition-all text-lg shadow-lg shadow-sky-200">
-            {loading ? (
-              <span className="flex items-center justify-center gap-2">
-                <svg className="animate-spin h-5 w-5" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"/></svg>
-                Generating Sequence...
-              </span>
-            ) : "Generate Email Sequence"}
+          {error && <p className="text-red-600 text-sm">{error}</p>}
+          <button onClick={generate} disabled={loading}
+            className="w-full bg-teal-600 hover:bg-teal-700 disabled:bg-teal-400 text-white font-semibold py-3 rounded-lg transition-colors">
+            {loading ? "Generating email sequence..." : "Generate Onboarding Emails"}
           </button>
         </div>
 
-        {emails.length > 0 && (
-          <div>
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-xl font-bold text-slate-800">7-Email Onboarding Sequence</h2>
-              <button onClick={copyAll}
-                className="px-4 py-2 rounded-lg bg-slate-800 text-white text-sm font-medium hover:bg-slate-700">
-                {copied ? "✓ Copied All" : "Copy All Emails"}
+        {done && result && (
+          <div className="mt-8 bg-white rounded-2xl shadow-lg overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 bg-teal-50 border-b border-teal-200">
+              <p className="text-teal-800 font-bold text-sm">📧 Onboarding Email Sequence</p>
+              <button onClick={() => navigator.clipboard?.writeText(result)}
+                className="px-3 py-1.5 rounded-lg bg-teal-100 hover:bg-teal-200 text-teal-800 text-xs font-medium transition-all">
+                📋 Copy All
               </button>
             </div>
-            <div className="flex gap-2 overflow-x-auto pb-2 mb-4">
-              {emails.map((e, i) => (
-                <button key={i} onClick={() => setActiveEmail(i)}
-                  className={`shrink-0 px-4 py-2 rounded-xl text-sm font-medium transition-all ${activeEmail === i ? "bg-sky-600 text-white" : "bg-white border border-slate-200 text-slate-600 hover:bg-slate-50"}`}>
-                  Day {e.day}
-                </button>
-              ))}
+            <div className="px-6 py-5">
+              {renderMarkdown(result)}
             </div>
-            {emails[activeEmail] && (() => {
-              const email = emails[activeEmail];
-              const triggerKey = email.trigger?.toLowerCase().includes("immediately") ? "immediately" : `day ${email.day}`;
-              return (
-                <div className="bg-white rounded-2xl shadow-lg border border-slate-200 overflow-hidden">
-                  <div className="bg-slate-50 border-b border-slate-200 p-6">
-                    <div className="flex items-center gap-3 mb-3">
-                      <span className={`text-xs font-bold uppercase px-2.5 py-1 rounded-full ${triggerColors[triggerKey] || "bg-slate-100 text-slate-600"}`}>
-                        {email.trigger}
-                      </span>
-                      <span className="text-xs text-slate-400">Goal: {email.goal}</span>
-                    </div>
-                    <div className="space-y-1">
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Subject</p>
-                      <p className="font-semibold text-slate-800">{email.subject}</p>
-                      <p className="text-xs text-slate-400">Preview: {email.preview}</p>
-                    </div>
-                  </div>
-                  <div className="p-6">
-                    <div className="prose prose-slate max-w-none text-slate-700 leading-relaxed whitespace-pre-line">
-                      {email.body.split("[CTA:").map((part: string, i: number) =>
-                        i === 0 ? <span key={i}>{part}</span> :
-                          <span key={i}>
-                            {" "}<button className="inline-block bg-sky-100 text-sky-700 font-semibold px-3 py-1 rounded-lg text-sm mx-0.5">{part.split("]")[0]}</button>{part.split("]")[1] || ""}
-                          </span>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              );
-            })()}
           </div>
         )}
       </div>
